@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en-IN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Trade cards</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #EEF3F1;
+    --ink: #14233A;
+    --slate: #536476;
+    --rule: #C6D4D0;
+    --notice: #E1EAE7;
+    --track: #DAE4E1;
+    --marigold: #F2B705;
+    --on-marigold: #14233A;
+    --stop: #A61E34;
+    --part0: #14233A;
+    --part1: #3E6C8E;
+    --part2: #7EA6B9;
+    --part3: #AFC8CF;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #13202D;
+      --ink: #E4ECEE;
+      --slate: #9DB0BD;
+      --rule: #2B3D4E;
+      --notice: #1A2A39;
+      --track: #223344;
+      --stop: #F28B99;
+      --part0: #E4ECEE;
+      --part1: #8FB5CF;
+      --part2: #5E8AA0;
+      --part3: #3F6275;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font: 400 17px/1.5 "Barlow", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    font-variant-numeric: tabular-nums;
+  }
+  .page {
+    max-width: 34rem;
+    margin: 0 auto;
+    padding: calc(env(safe-area-inset-top, 0px) + 1.75rem) 1.25rem 0;
+  }
+  h1 {
+    margin: 0 0 .5rem;
+    font: 600 2.1rem/1.05 "Barlow Condensed", "Arial Narrow", sans-serif;
+  }
+  .market { margin: 0; }
+  .market-note { margin: .2rem 0 0; color: var(--slate); font-size: .92rem; }
+
+  .slips { margin: 1.5rem 0 0; padding: 0; list-style: none; border-top: 2px solid var(--ink); }
+  .slip { padding: 1.1rem 0 1.3rem; border-bottom: 1px solid var(--rule); }
+  .slip-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
+  .symbol { margin: 0; font: 600 1.8rem/1 "Barlow Condensed", "Arial Narrow", sans-serif; overflow-wrap: anywhere; }
+  .score { margin: 0; color: var(--slate); white-space: nowrap; }
+  .score strong { color: var(--ink); font-size: 1.2rem; font-weight: 600; }
+  .order { margin: .55rem 0 0; font-size: 1.05rem; }
+  .amount { font-weight: 600; }
+  .stop { margin: .1rem 0 0; }
+  .stop-price { color: var(--stop); font-weight: 600; }
+  .stop-gap { color: var(--slate); font-size: .92rem; }
+  .target { margin: .1rem 0 0; color: var(--slate); font-size: .92rem; }
+  .target-price { color: var(--ink); font-weight: 600; }
+  .close-note { margin: .6rem 0 0; color: var(--slate); font-size: .92rem; }
+  .bar { display: flex; height: .55rem; margin: .9rem 0 .4rem; background: var(--track); overflow: hidden; }
+  .bar span { display: block; height: 100%; }
+  .parts { margin: 0; color: var(--slate); font-size: .86rem; }
+  .why { margin: .55rem 0 0; }
+
+  .dock {
+    position: sticky;
+    bottom: 0;
+    margin-top: 1.25rem;
+    padding: 1rem 0 calc(env(safe-area-inset-bottom, 0px) + 1rem);
+    background: var(--paper);
+    border-top: 2px solid var(--ink);
+  }
+  .total { margin: 0 0 .75rem; }
+  .send {
+    width: 100%;
+    min-height: 3.6rem;
+    border: 0;
+    border-radius: 6px;
+    background: var(--marigold);
+    color: var(--on-marigold);
+    font: 600 1.35rem/1 "Barlow Condensed", "Arial Narrow", sans-serif;
+    cursor: pointer;
+  }
+  .send:disabled { background: var(--track); color: var(--slate); cursor: not-allowed; }
+  .send:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+  .send:active:not(:disabled) { transform: translateY(1px); }
+  .hint { margin: .6rem 0 0; color: var(--slate); font-size: .92rem; }
+
+  .notice { margin: 1.5rem 0 2rem; padding: 1rem 1.1rem; background: var(--notice); border-left: 4px solid var(--ink); }
+  .notice h2 { margin: 0 0 .25rem; font: 600 1.35rem/1.2 "Barlow Condensed", "Arial Narrow", sans-serif; }
+  .notice p { margin: 0; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .send:active:not(:disabled) { transform: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <header id="top"></header>
+  <main id="main"></main>
+</div>
+<script>
+"use strict";
+
+/* Your Kite developer app key. Paste it between the quotes. */
+const KITE_API_KEY = "PASTE_YOUR_KITE_API_KEY_HERE";
+
+/* Hard limits. The send button stays off if a card breaks any of these. */
+const LIMITS = {
+  maxTotal: 25000,        // rupees across all orders in one day's link
+  maxOrders: 5,
+  maxStopPct: 10,         // Zerodha cover-order stops must sit within 10% of the price
+  opensAt: 9 * 60 + 15,   // 9:15 AM India time
+  closesAt: 15 * 60       // 3:00 PM India time
+};
+
+const BASKET_URL = "https://kite.zerodha.com/connect/basket";
+const PARTS = [["Price strength", 40], ["Volume", 30], ["News", 20], ["Vs Nifty", 10]];
+const money = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const rupees = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 });
+const headerEl = document.getElementById("top");
+const mainEl = document.getElementById("main");
+
+function el(tag, attrs, ...children) {
+  const node = document.createElement(tag);
+  for (const [key, value] of Object.entries(attrs || {})) {
+    if (key === "class") node.className = value;
+    else node.setAttribute(key, value);
+  }
+  for (const child of children) if (child !== null && child !== undefined) node.append(child);
+  return node;
+}
+
+function istNow() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hourCycle: "h23"
+  }).formatToParts(new Date());
+  const p = Object.fromEntries(parts.map(x => [x.type, x.value]));
+  return { date: `${p.year}-${p.month}-${p.day}`, minutes: Number(p.hour) * 60 + Number(p.minute) };
+}
+
+function longDate(iso) {
+  return new Intl.DateTimeFormat("en-IN", { weekday: "long", day: "numeric", month: "long", timeZone: "Asia/Kolkata" })
+    .format(new Date(`${iso}T12:00:00+05:30`));
+}
+
+function decode(token) {
+  let b64 = token.replace(/-/g, "+").replace(/_/g, "/");
+  while (b64.length % 4) b64 += "=";
+  const bytes = Uint8Array.from(atob(b64), ch => ch.charCodeAt(0));
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+
+function sampleCards(today) {
+  return {
+    v: 1, demo: true, d: today, m: "mixed", b: 25000,
+    n: "Sample cards to check the page. The button stays off.",
+    t: [
+      { s: "SAMPLEA", q: 10, p: 1240, sl: 1212, tg: 1282, sc: 78, f: [34, 24.5, 15, 4.5], r: "Sample note: target raised by a broker (source name)" },
+      { s: "SAMPLEB", q: 36, p: 315.4, sl: 308.15, tg: 326.3, sc: 66, f: [28, 20, 10, 8], r: "Sample note: no notable news" }
+    ]
+  };
+}
+
+function validate(c) {
+  if (!c || c.v !== 1 || !Array.isArray(c.t)) return "The link isn't in the format this page expects.";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(c.d))) return "The link has no trading date.";
+  if (typeof c.b !== "number" || !(c.b >= 0) || c.b > LIMITS.maxTotal) return `The day's budget is above your ${rupees.format(LIMITS.maxTotal)} limit.`;
+  if (c.t.length > LIMITS.maxOrders) return `The link has ${c.t.length} orders, more than your limit of ${LIMITS.maxOrders}.`;
+  let total = 0;
+  for (const x of c.t) {
+    if (!/^[A-Z0-9&-]{1,20}$/.test(String(x.s))) return "A stock symbol in the link isn't valid.";
+    if (!Number.isInteger(x.q) || x.q < 1) return `${x.s} doesn't have a whole number of shares.`;
+    if (!(x.p > 0) || !(x.sl > 0) || x.sl >= x.p) return `${x.s} needs a stop-loss below its buy price.`;
+    if ((x.p - x.sl) / x.p * 100 > LIMITS.maxStopPct) return `${x.s} has a stop-loss more than ${LIMITS.maxStopPct}% below the buy price, which Kite won't accept.`;
+    total += x.q * x.p;
+  }
+  if (total > Math.min(c.b, LIMITS.maxTotal) + 0.005) return `The orders add up to ${money.format(total)}, more than the day's budget.`;
+  return null;
+}
+
+function notice(title, body) {
+  mainEl.replaceChildren(el("section", { class: "notice", role: "status" }, el("h2", null, title), el("p", null, body)));
+}
+
+function buttonState(c) {
+  const n = c.t.length;
+  const orders = `${n} ${n === 1 ? "order" : "orders"}`;
+  if (c.demo) return { on: false, label: "Sample only", hint: "This is a preview of the page. Real cards arrive in your morning email." };
+  if (KITE_API_KEY.startsWith("PASTE_")) return { on: false, label: "Add your Kite API key", hint: "Edit index.html on GitHub and paste your key into KITE_API_KEY." };
+  const now = istNow();
+  if (c.d !== now.date) return { on: false, label: "Expired", hint: `These cards were for ${longDate(c.d)}. Use today's email instead.` };
+  if (now.minutes < LIMITS.opensAt) return { on: false, label: "Opens at 9:15 AM", hint: "The button turns on when the market opens. Keep this page open or come back then." };
+  if (now.minutes >= LIMITS.closesAt) return { on: false, label: "Closed for today", hint: "This page stops sending new intraday orders at 3:00 PM." };
+  return { on: true, label: `Send ${orders} to Kite`, hint: "Kite opens with these cover orders filled in and locked. Log in if asked, check them, and confirm there." };
+}
+
+function send(c) {
+  const basket = c.t.map(x => ({
+    variety: "co", exchange: "NSE", tradingsymbol: x.s, transaction_type: "BUY",
+    order_type: "LIMIT", product: "MIS", quantity: x.q, price: x.p, trigger_price: x.sl,
+    readonly: true, tag: "cards"
+  }));
+  const form = el("form", { method: "post", action: BASKET_URL },
+    el("input", { type: "hidden", name: "api_key", value: KITE_API_KEY }),
+    el("input", { type: "hidden", name: "data", value: JSON.stringify(basket) }));
+  document.body.append(form);
+  form.submit();
+}
+
+function render(c) {
+  headerEl.replaceChildren(
+    el("h1", null, c.demo ? "Sample cards" : `Trades for ${longDate(c.d)}`),
+    el("p", { class: "market" }, `Market reading: ${c.m}. Day's budget: ${rupees.format(c.b)}.`),
+    c.n ? el("p", { class: "market-note" }, c.n) : null
+  );
+  if (!c.t.length) {
+    notice("No trades today", "No stock reached your minimum score with a share that fits the budget, so there's nothing to place.");
+    return;
+  }
+  const list = el("ul", { class: "slips" });
+  let total = 0;
+  for (const x of c.t) {
+    const value = x.q * x.p;
+    total += value;
+    const f = Array.isArray(x.f) ? x.f.map(Number) : [];
+    const breakdown = PARTS.map(([name, max], i) => `${name} ${f[i] ?? 0} of ${max}`).join(", ");
+    const bar = el("div", { class: "bar", role: "img", "aria-label": `Score ${x.sc} of 100. ${breakdown}.` });
+    f.slice(0, 4).forEach((pts, i) => bar.append(el("span", { style: `width:${Math.max(0, Math.min(100, pts))}%;background:var(--part${i})` })));
+    list.append(el("li", { class: "slip" },
+      el("div", { class: "slip-head" },
+        el("h2", { class: "symbol" }, x.s),
+        el("p", { class: "score" }, "Score ", el("strong", null, String(x.sc)), " of 100")),
+      el("p", { class: "order" }, `${x.q} ${x.q === 1 ? "share" : "shares"} at ${money.format(x.p)} = `, el("span", { class: "amount" }, money.format(value))),
+      el("p", { class: "stop" }, "Stop-loss ", el("span", { class: "stop-price" }, money.format(x.sl)),
+        el("span", { class: "stop-gap" }, `, ${money.format(x.p - x.sl)} below the buy price`)),
+      (typeof x.tg === "number" && x.tg > x.p)
+        ? el("p", { class: "target" }, "Reference target ", el("span", { class: "target-price" }, money.format(x.tg)), ", not automatic: exit from Kite's order book")
+        : null,
+      bar,
+      el("p", { class: "parts" }, breakdown),
+      x.r ? el("p", { class: "why" }, String(x.r)) : null));
+  }
+  const button = el("button", { class: "send", type: "button" });
+  const hint = el("p", { class: "hint", "aria-live": "polite" });
+  const count = `${c.t.length} ${c.t.length === 1 ? "order" : "orders"}`;
+  mainEl.replaceChildren(list, el("div", { class: "dock" },
+    el("p", { class: "total" }, `${money.format(total)} across ${count}, of the ${rupees.format(c.b)} budget`),
+    button, hint,
+    el("p", { class: "close-note" }, "Intraday cover orders: a bought stock sells at its stop-loss, when you exit it from Kite's order book, or when Zerodha squares it off before the close (3:12 PM for F&O-list stocks, 3:25 PM for the rest, ₹50 + GST per order it closes).")));
+
+  const refresh = () => {
+    const s = buttonState(c);
+    button.textContent = s.label;
+    button.disabled = !s.on;
+    hint.textContent = s.hint;
+  };
+  refresh();
+  const timer = setInterval(refresh, 20000);
+  button.addEventListener("click", () => {
+    if (!buttonState(c).on) { refresh(); return; }
+    clearInterval(timer);
+    button.disabled = true;
+    button.textContent = "Opening Kite…";
+    send(c);
+  });
+}
+
+function start() {
+  const params = new URLSearchParams(location.search);
+  if (params.has("status")) {
+    const ok = params.get("status") === "success";
+    headerEl.replaceChildren(el("h1", null, "Back from Kite"));
+    notice(ok ? "Orders sent to Kite" : "Kite didn't confirm the orders",
+      ok ? "Check the order book in Kite to see which buys filled. Each filled buy carries its stop-loss; exit at your target from the order book, or Zerodha squares off what's left before the close. Unfilled orders cancel at the end of the day."
+         : "Check the order book in Kite before trying again.");
+    history.replaceState(null, "", location.pathname);  // drop the session token Kite adds to the address
+    return;
+  }
+  const token = location.hash.slice(1);
+  if (!token) {
+    headerEl.replaceChildren(el("h1", null, "Trade cards"));
+    notice("No cards loaded", "Open this page from the link in your morning email.");
+    return;
+  }
+  let cards;
+  try {
+    cards = token === "demo" ? sampleCards(istNow().date) : decode(token);
+  } catch (err) {
+    headerEl.replaceChildren(el("h1", null, "Trade cards"));
+    notice("This link is damaged", "Open the page again from your morning email. If it happens again, the link was cut off in the email.");
+    return;
+  }
+  const problem = validate(cards);
+  if (problem) {
+    headerEl.replaceChildren(el("h1", null, "Trade cards"));
+    notice("Safety check failed", `${problem} The button is off.`);
+    return;
+  }
+  render(cards);
+}
+
+start();
+</script>
+</body>
+</html>
